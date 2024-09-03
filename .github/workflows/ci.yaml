@@ -1,0 +1,99 @@
+name: ci
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  push:
+    # Publish `main` as Docker `latest` image.
+    branches:
+      - main
+      - release-*
+    # Publish `v1.2.3` tags as releases.
+    tags:
+      - 'v*.*.*'
+  # Run tests for PRs
+  pull_request:
+    branches:
+      - main
+      - release-*
+env:
+  VAULT_ADDR: https://vault.eng.aserto.com/
+  PRE_RELEASE: ${{ github.ref == 'refs/heads/main' && 'development' || '' }}
+  GO_VERSION: "1.22"
+  GO_RELEASER_VERSION: "v1.24.0"
+  GO_LANGCI_LINT_VERSION: "v1.56.2"
+  GO_TESTSUM_VERSION: "1.11.0"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      -
+        name: Build
+        uses: goreleaser/goreleaser-action@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          distribution: goreleaser
+          version: ${{ env.GO_RELEASER_VERSION }}
+          args: build --clean --snapshot --single-target
+      -
+        name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: ${{ env.GO_LANGCI_LINT_VERSION }}
+          args: --timeout=30m
+      -
+        name: Test Setup
+        uses: gertd/action-gotestsum@v3.0.0
+        with:
+          gotestsum_version: ${{ env.GO_TESTSUM_VERSION }}
+      -
+        name: Test
+        run: |
+          gotestsum --format short-verbose -- -count=1 -parallel=1 -v -timeout=240s ./...
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    # Only release when ref is a tag
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      -
+        name: Read Configuration
+        uses: hashicorp/vault-action@v3
+        id: vault
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          token: ${{ secrets.VAULT_TOKEN }}
+          secrets: |
+            kv/data/github    "READ_WRITE_TOKEN"                        | READ_WRITE_TOKEN;
+            kv/data/github    "ASERTO_TAP"                              | ASERTO_TAP;
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      -
+        name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      -
+        name: Release
+        uses: goreleaser/goreleaser-action@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          distribution: goreleaser
+          version: ${{ env.GO_RELEASER_VERSION }}
+          args: release --clean

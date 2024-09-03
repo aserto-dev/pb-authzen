@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+option go_package = "github.com/aserto-dev/pb-authzen/authzen/api;api"; 
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/any.proto";
+
+package aserto.authzen.api;
+
+message Evaluation {
+  Subject subject                                 = 1;
+  Action action                                   = 2;
+  Resource resource                               = 3;
+  google.protobuf.Struct context                  = 4;
+}
+
+message Subject {
+  string type                                     = 1;
+  string id                                       = 2;
+  google.protobuf.Struct properties               = 3;
+}
+
+message Action {
+  string name                                     = 1;
+  google.protobuf.Struct properties               = 2;
+}
+
+message Resource {
+  string type                                     = 1;
+  string id                                       = 2;
+  google.protobuf.Struct properties               = 3;
+}

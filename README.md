@@ -1,2 +1,3 @@
 # pb-authzen
-OpenID AuthZen protobuf definition
+
+OpenID AuthZen ProtoBuf definition

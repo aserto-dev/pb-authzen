@@ -1,0 +1,119 @@
+project_name: check2decision
+
+env:
+  # https://goreleaser.com/customization/env/
+  - REGISTRY=ghcr.io
+  - ORG=aserto-dev
+  - REPO=pb-authzen
+  - DESCRIPTION=OIDF AuthZen ProtoBuf definition 
+  - LICENSE=MIT
+
+before:
+  # https://goreleaser.com/customization/hooks/
+  hooks:
+
+builds:
+  # https://goreleaser.com/customization/build/
+  - id: build
+    main: "./cmd/{{.ProjectName}}"
+    binary: "{{.ProjectName}}"
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s
+      - -w
+      - -X github.com/{{ .Env.ORG }}/{{ .Env.REPO }}/pkg/version.ver={{.Version}}
+      - -X github.com/{{ .Env.ORG }}/{{ .Env.REPO }}/pkg/version.commit={{.ShortCommit}}
+      - -X github.com/{{ .Env.ORG }}/{{ .Env.REPO }}/pkg/version.date={{.Date}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  # https://goreleaser.com/customization/archive/
+  - format: zip
+    builds:
+    - build
+    files:
+      - LICENSE
+      - README.md
+    name_template: >-
+      {{ .Env.REPO }}_{{ .Os }}_{{- if eq .Arch "amd64" }}x86_64{{- else }}{{ .Arch }}{{ end }}
+
+checksum:
+  # https://goreleaser.com/customization/checksum/
+  name_template: 'checksums.txt'
+
+snapshot:
+  # https://goreleaser.com/customization/snapshots/
+  name_template: "{{ incpatch .Version }}-{{ .ShortCommit }}{{ if .IsGitDirty }}-dirty{{ end }}"
+
+source:
+  # https://goreleaser.com/customization/source/
+  enabled: false
+
+changelog:
+  # https://goreleaser.com/customization/changelog/
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  # https://goreleaser.com/customization/release/
+  github:
+    owner: "{{ .Env.ORG }}"
+    name: "{{ .Env.REPO }}"
+
+  draft: false
+  prerelease: "false"
+  name_template: "{{.ProjectName}} {{.Tag}}"
+
+blobs:
+  # https://goreleaser.com/customization/blob/
+
+brews:
+  # https://goreleaser.com/customization/homebrew/
+  -
+    name: "{{.ProjectName}}"
+
+    repository:
+      owner: "{{ .Env.ORG }}"
+      name: homebrew-tap
+      token: "{{ .Env.ASERTO_TAP }}"
+
+    url_template: "https://github.com/{{ .Env.ORG }}/{{ .Env.REPO }}/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+
+    download_strategy: CurlDownloadStrategy
+
+    commit_author:
+      name: Aserto Bot
+      email: github-bot@aserto.com
+
+    homepage: "https://github.com/aserto-dev/check2decision"
+
+    description: "{{ .Env.DESCRIPTION }}"
+
+    license: "MIT"
+
+    skip_upload: false
+
+    test: |
+      system "#{bin}/{{.ProjectName}} --version"
+    install: |
+      bin.install "{{.ProjectName}}"
+
+dockers:
+  # https://goreleaser.com/customization/docker/
+
+docker_manifests:
+  # https://goreleaser.com/customization/docker_manifest/
